@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "the-loop": {
+      "source": {
+        "source": "github",
+        "repo": "MadaraUchiha-314/the-loop"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "the-loop@the-loop": true
+  }
+}
