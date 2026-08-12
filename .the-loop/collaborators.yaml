@@ -1,0 +1,25 @@
+# .the-loop/collaborators.yaml
+# Validated against .the-loop/collaborators.schema.json.
+#
+# The stewards of the repository (CODEOWNERS-like) and the SINGLE source of truth
+# for who collaborates on this project and how they are notified (issue-82,
+# decision-035). Collaborators may be individuals or groups; a user can hold
+# multiple roles. All collaboration happens through ticket/PR comments (the paper
+# trail); the channels below are the primary way the agent harness NOTIFIES a
+# collaborator that their action is pending — never where decisions land.
+#
+# Which events notify which roles is configured in harness-config.yaml
+# (notifications.events). The CLI daemon never reads this file: the operator
+# declares their own recipients, in this same structure, in cli-config.yaml.
+
+version: "0.1.0"
+
+collaborators:
+  - handle: "@Konoha-14"
+    kind: individual              # individual | group
+    roles: [product-manager, architect, engineer, approver]
+    notifications:
+      enabled: false              # per-user master switch — no Slack configured yet (only supported channel)
+      channels: []                # add a slack channel here to receive pending-action pings
+  # To add more people, copy the block above with their @handle and roles
+  # (product-manager | architect | designer | engineer | qa | reviewer | approver).
