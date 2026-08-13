@@ -1,2 +1,11 @@
 # Local, machine-specific Claude Code settings (permissions, etc.)
 .claude/settings.local.json
+
+# the-loop: generated runtime/local state under .the-loop (see the-loop .gitignore).
+# The tracked config (harness-config.yaml, collaborators.yaml, cli-config.yaml,
+# schemas, manifest) stays; only machine-local state and logs are ignored.
+.the-loop/local/
+.the-loop/logs/
+.the-loop/*.pid
+.the-loop/poll-status.json
+.the-loop/learnings-pending/
