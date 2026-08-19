@@ -45,6 +45,7 @@ flowchart TB
     W1["W1 core: fact-bank schema<br/>+ state machine + allowlist types"]
     W2["W2 monorepo scaffold<br/>+ tooling + CI + migrations runner"]
     W3["W3 allowlist content<br/>(ops/*.yaml) + seed"]
+    W17["W17 infra/deploy<br/>(Postgres, object store, CDN, cron, secrets)"]
   end
   subgraph M1["M1 · Content Plane"]
     W4["W4 coordinator<br/>(state-machine walker, fan-out/gather)"]
@@ -53,6 +54,7 @@ flowchart TB
     W7["W7 image step<br/>(+ attribution, object store)"]
     W8["W8 human QA surface<br/>(flag-only)"]
     W9["W9 scheduler<br/>(calendar + theme arcs)"]
+    W18["W18 metrics<br/>(rejection rate, engagement signals)"]
   end
   subgraph M2["M2 · Serving Plane"]
     W10["W10 bake job → daily.json → CDN"]
@@ -64,6 +66,7 @@ flowchart TB
     W14["W14 email digest"]
     W15["W15 theme arcs end-to-end"]
     W16["W16 buffer-depth monitoring"]
+    W19["W19 cold-start buffer<br/>(pre-generate N days for launch)"]
   end
 
   W2 --> W1
@@ -80,7 +83,18 @@ flowchart TB
   W11 --> W14
   W9 --> W15
   W4 --> W16
+  W2 --> W17
+  W17 --> W10
+  W17 --> W4
+  W6 --> W18
+  W9 --> W19
+  W19 --> W10
 ```
+
+> **Decisions promoted to explicit items** (were watch-items): the **canonical publish
+> boundary** (a single UTC cutoff for the global "today") is settled as **D10** and enforced
+> by W9/W10; the **managed-auth provider** choice (Clerk vs Supabase vs Auth0, per D9) is
+> **D11**, settled in W12. Both are decision records under `docs/decisions/`, not just prose.
 
 ## Requirements
 
@@ -104,6 +118,9 @@ allowlist content, so that every later plane is written against one stable contr
 3. WHEN M0 is complete THEN **W3 allowlist content** SHALL exist as `ops/*.yaml`
    (3–5 source types × 4 categories) and seed into `SourceAllowlist` at `version = 1`
    (→ F6).
+4. WHEN M0 is complete THEN **W17 infra/deploy** SHALL provision the runtime substrate —
+   managed Postgres, object store (S3/R2), CDN, the nightly cron trigger, and secret
+   management — as IaC under `infra/`, so both planes have somewhere to run (→ N1, N4, D9).
 
 ### Requirement 2 — M1 · Content Plane (produce verified facts)
 
@@ -124,7 +141,12 @@ and human-gate facts into the bank, so that a multi-day buffer of `PUBLISHED` fa
 5. WHEN M1 is complete THEN **W8 human-QA surface** SHALL list only `NEEDS_HUMAN` rows with
    their verification trail and offer approve/reject (→ F7).
 6. WHEN M1 is complete THEN **W9 scheduler** SHALL assign `AUTO_APPROVED` candidates to
-   `publish_date`s honoring weekly theme arcs and near-term dedup (→ F9, D1).
+   `publish_date`s honoring weekly theme arcs and near-term dedup, against the canonical
+   UTC publish boundary **D10** (→ F9, D1, D10).
+7. WHEN M1 is complete THEN **W18 metrics** SHALL record the **per-category verifier
+   rejection rate** (architecture §7 — a first-class metric that tunes flag thresholds) and
+   the engagement signals later personalization needs, without adding a read-path call
+   (→ N3, N6).
 
 ### Requirement 3 — M2 · Serving Plane (deliver the card + user state)
 
@@ -136,7 +158,8 @@ answer the quiz, and keep my streak, so that the 30-second ritual works.
 1. WHEN M2 is complete THEN **W10 bake job** SHALL emit the next day's `daily.json`
    (fact + image URL + quiz, answers withheld) to the CDN, from `PUBLISHED` rows only (→ N1, F1).
 2. WHEN M2 is complete THEN **W12 user-state + accounts** SHALL provide account-gated
-   identity via managed auth and the `USERS`/`USER_FACT`/`STREAKS` tables (→ F4, D9).
+   identity via a chosen managed-auth provider (**D11**: Clerk | Supabase | Auth0) and the
+   `USERS`/`USER_FACT`/`STREAKS` tables (→ F4, D9, D11).
 3. WHEN M2 is complete THEN **W11 read API** SHALL serve the read path, accept quiz answers,
    and update streaks with the freeze allowance (→ F1, F2, F3, F4).
 4. WHEN M2 is complete THEN **W13 PWA client** SHALL render the daily card + quiz + streak
@@ -155,6 +178,9 @@ that the habit sticks and a bad night never ships an empty card.
    scheduling → card) (→ F9).
 3. WHILE the pipeline runs THEN **W16 monitoring** SHALL alert when the `AUTO_APPROVED`/
    `SCHEDULED` buffer depth falls below the multi-day threshold (→ N5).
+4. BEFORE launch THEN **W19 cold-start buffer** SHALL pre-generate and schedule at least N
+   days of `PUBLISHED` facts (the first editorial calendar), so day one is not an empty card
+   (→ N5).
 
 ## Non-functional requirements
 
@@ -176,7 +202,7 @@ that the habit sticks and a bad night never ships an empty card.
 - **Actors & trust:** Authors/readers are first-party (product, architect, engineers). The
   content is a roadmap; it stores no user data, secrets, or third-party input.
 - **Trust boundaries & data:** None crossed by this artifact. The *security work* lives in
-  the individual work items and is gated there — each of W1–W16 carries its own Security
+  the individual work items and is gated there — each of W1–W19 carries its own Security
   considerations at its requirements phase. Two are flagged now so they are not forgotten:
   **W11/W12** (auth, quiz-answer integrity, streak tampering — the real request surface)
   and **W7** (image licensing/attribution — legal, not just technical).
@@ -199,10 +225,12 @@ hand-off note). The architecture's own open questions (§11) are **watch-items**
 blockers, and attach to specific later work items rather than gating the plan:
 
 1. **Verifier "independence" definition** beyond "distinct domain" — attaches to **W6**;
-   ship crude, track per-category rejection rate. Not a blocker for W1–W5.
+   ship crude, track per-category rejection rate (**W18**). Not a blocker for W1–W5.
 2. **Image hybrid ratio + licensing** — attaches to **W7**.
-3. **Canonical publish boundary (UTC cutoff)** for global "today" — attaches to **W9/W10**.
-4. **Human-QA staffing cadence** — attaches to **W8**; flag-only keeps it small at MVP.
+3. **Human-QA staffing cadence** — attaches to **W8**; flag-only keeps it small at MVP.
+
+_Two former watch-items are now settled as explicit items/decisions:_ the **publish boundary**
+(→ **D10**, enforced by W9/W10) and the **managed-auth provider** (→ **D11**, chosen in W12).
 
 ## Review comments
 
