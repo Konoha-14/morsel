@@ -17,5 +17,12 @@ Seed decisions carried over from the architecture paper (`../architecture.md` §
 | D8 | Email digest first, Web Push fast-follow | accepted |
 | D9 | Reuse the known stack (FastAPI + SQLModel + Postgres) | accepted |
 
+Decisions raised by the MVP milestone breakdown (`../specs/draft-mvp-milestones/requirements.md`):
+
+| ID | Decision | Status |
+|----|----------|--------|
+| D10 | Single canonical UTC publish boundary for the global "today" (enforced by W9/W10) | proposed |
+| D11 | Managed-auth provider for accounts — Clerk \| Supabase \| Auth0 (chosen in W12) | open |
+
 New decisions taken through the-loop get their own `decision-<nnn>.md` and a row here.
 Conflicts between instruction sources are logged in [`conflicts.md`](conflicts.md).
